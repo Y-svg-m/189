@@ -74,7 +74,7 @@ async function main() {
   for (let index = 0; index < accounts.length; index++) {
     const account = accounts[index];
     const { userName, password } = account;
-    const userNameInfo = mask(userName, 2, 9);
+    const userNameInfo = mask(userName, 1, 10);
     const logger = log4js.getLogger(userName);
     logger.addContext("user", userNameInfo);
     await run(userName, password, userSizeInfoMap, logger);
