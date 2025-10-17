@@ -152,4 +152,4 @@ npm start
 
 ![](https://cdn.jsdelivr.net/gh/wes-lin/Cloud189Checkin/image/group.jpg)
 
-## [更新内容](https://github.com/wes-lin/Cloud189Checkin/wiki/更新内容)
+## [更新内容](https://github.com/wes-lin/Cloud189Checkin/wiki/更新内容
