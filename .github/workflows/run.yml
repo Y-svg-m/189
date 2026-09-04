@@ -1,26 +1,35 @@
 name: Cloud check in action
-
 on:
   push:
     branches:
       - main
+  watch:
+    types: started
   workflow_dispatch:
   schedule:
-    - cron: '35 2 * * *'
-
+    - cron: 35 2 * * *
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    environment: user
     steps:
+      - name: 🔀 random delay 0-300 seconds
+        run: sleep $((RANDOM % 301))
+
       - name: 🔌 Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@main
 
       - name: 🔨 Setup Node.js environment
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@main
         with:
           node-version: 18
           cache: npm
 
+      - name: 👾 Check if Debug is true
+        if: vars.debug == '1'
+        run: |
+          echo "CLOUD189_VERBOSE=1" >> $GITHUB_ENV
+      
       - name: 📹 Restore cached Cookie
         id: cache-cookie-restore
         uses: actions/cache/restore@v4
@@ -29,27 +38,29 @@ jobs:
           key: cloud189-token-${{ hashFiles('.token/*.json') }}
           restore-keys: cloud189-token-
 
-      - name: 📡 Install dependencies
-        run: npm ci || npm install
+      - name: 🔧 Init secrets
+        uses: shine1594/secrets-to-env-action@master
+        with:
+          secrets: ${{ toJSON(secrets) }}
+          secrets_env: production
+          prefix_prod: ""
+          file_name_prod: .env
+
+      - name: 📡 Init dependencies
+        run: npm install
 
       - name: 🚀 Run
-        env:
-          # 原生注入环境变量，无需将 secrets 全量写入 .env 文件
-          # 如果你的程序需要其他变量，可以直接在这里追加
-          CLOUD189_VERBOSE: ${{ vars.debug == '1' && '1' || '0' }}
-          ACCOUNTS: ${{ secrets.ACCOUNTS }}
-          USER: ${{ secrets.USER }}
-          PASSWORD: ${{ secrets.PASSWORD }}
-          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
-        run: npm start
+        uses: nick-fields/retry@master
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: npm start
 
       - name: 🔑 Compute token hash
         if: always()
         run: |
-          if [ -d ".token" ]; then
-            NEW_HASH=$(find .token -name '*.json' -exec sha256sum {} \; 2>/dev/null | sha256sum | cut -d' ' -f1)
-            echo "TOKEN_HASH=${NEW_HASH}" >> $GITHUB_ENV
-          fi
+          NEW_HASH=$(find .token -name '*.json' -exec sha256sum {} \; 2>/dev/null | sha256sum | cut -d' ' -f1)
+          echo "TOKEN_HASH=${NEW_HASH}" >> $GITHUB_ENV
 
       - name: 📹 Save cached Cookie
         if: always() && env.TOKEN_HASH != ''
@@ -57,3 +68,21 @@ jobs:
         with:
           path: .token
           key: cloud189-token-${{ env.TOKEN_HASH }}
+
+      - name: 🚗 Keep Running
+        if: github.event_name == 'schedule'
+        run: |
+          git config --local user.email "${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com"
+          git config --local user.name "${{ github.actor }}"
+          git remote set-url origin https://${{ github.actor }}:${{ github.token }}@github.com/${{ github.repository }}
+          git pull --rebase --autostash
+          git commit --allow-empty -m "Keep Running..."
+          git push
+
+      - name: 🎉 Delete old workflow run
+        uses: Mattraks/delete-workflow-runs@main
+        with:
+          token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          retain_days: 0
+          keep_minimum_runs: 50
