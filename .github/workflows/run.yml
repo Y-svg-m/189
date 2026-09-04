@@ -37,12 +37,12 @@ jobs:
           key: cloud189-token-${{ hashFiles('.token/*.json') }}
           restore-keys: cloud189-token-
 
-      - name: 🔧 Init secrets
-        uses: shine1594/secrets-to-env-action@master
-        with:
-          secrets_env: production
-          prefix_prod: ""
-          file_name_prod: .env
+      - name: 🔧 Init secrets (Native)
+        # 抛弃第三方 Action，用原生 Shell 安全地将 Secrets 写入 .env
+        run: |
+          cat << 'EOF' > .env
+          ${{ secrets.ENV_CONFIG }}
+          EOF
 
       - name: 📡 Init dependencies
         run: npm install
