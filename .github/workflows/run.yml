@@ -13,6 +13,7 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    # 必须指定 environment，Actions 才能读取到该环境下的 Environment secrets
     environment: user
     steps:
       - name: 🔌 Check out code
@@ -37,11 +38,11 @@ jobs:
           key: cloud189-token-${{ hashFiles('.token/*.json') }}
           restore-keys: cloud189-token-
 
-      - name: 🔧 Init secrets (Native)
-        # 抛弃第三方 Action，用原生 Shell 安全地将 Secrets 写入 .env
+      - name: 🔧 Generate .env File
+        # 用原生 Shell 直接把 TY_ACCOUNTS 写入 .env 文件，不再触发 GitHub 拦截警告
         run: |
           cat << 'EOF' > .env
-          ${{ secrets.ENV_CONFIG }}
+          TY_ACCOUNTS=${{ secrets.TY_ACCOUNTS }}
           EOF
 
       - name: 📡 Init dependencies
@@ -50,16 +51,18 @@ jobs:
       - name: 🚀 Run
         uses: nick-fields/retry@v3
         with:
-          timeout_minutes: 5
-          max_attempts: 5
+          timeout_minutes: 10
+          max_attempts: 3
           retry_wait_seconds: 10
           command: npm start
 
       - name: 🔑 Compute token hash
         if: always()
         run: |
-          NEW_HASH=$(find .token -name '*.json' -exec sha256sum {} \; 2>/dev/null | sha256sum | cut -d' ' -f1)
-          echo "TOKEN_HASH=${NEW_HASH}" >> $GITHUB_ENV
+          if [ -d ".token" ]; then
+            NEW_HASH=$(find .token -name '*.json' -exec sha256sum {} \; 2>/dev/null | sha256sum | cut -d' ' -f1)
+            echo "TOKEN_HASH=${NEW_HASH}" >> $GITHUB_ENV
+          fi
 
       - name: 📹 Save cached Cookie
         if: always() && env.TOKEN_HASH != ''
